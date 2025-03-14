@@ -44,9 +44,18 @@
               <action android:name="android.service.notification.NotificationListenerService" />
           </intent-filter>
       </service>
+      
+      <receiver android:name="io.capawesome.capacitorjs.plugins.foregroundservice.NotificationActionBroadcastReceiver" />
+      <service android:name="io.capawesome.capacitorjs.plugins.foregroundservice.AndroidForegroundService" android:foregroundServiceType="location" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- Required to keep the app running in the background without any ressource limitations -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Required to request the manage overlay permission -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 </manifest>

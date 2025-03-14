@@ -1,10 +1,17 @@
 import { ChangeDetectorRef, Component, inject, OnInit } from '@angular/core';
 import { IonApp, IonContent, IonHeader, IonToolbar, IonTitle, IonList, IonItem, IonLabel } from '@ionic/angular/standalone';
-
-import { PluginListenerHandle, registerPlugin } from '@capacitor/core';
-import { SystemNotification, SystemNotificationListener } from 'capacitor4-notificationlistener';
+import { Platform } from '@ionic/angular';
+import { SystemNotification } from 'capacitor4-notificationlistener';
 import { CommonModule } from '@angular/common';
-const sn = new SystemNotificationListener();
+// import { SocketService } from './shared/service/socket.service';
+import { AndroidNotificationListenerService } from './shared/service/android-notification-listener.service';
+import { AndroidBackgroundRunnerService } from './shared/service/android-background-runner.service';
+import { distinctUntilChanged, filter, Observable } from 'rxjs';
+
+// Hàm so sánh tùy chỉnh để so sánh hai đối tượng
+const compareObjects = (prev: any, curr: any) => {
+  return JSON.stringify(prev) === JSON.stringify(curr);
+};
 
 @Component({
   selector: 'app-root',
@@ -21,51 +28,35 @@ const sn = new SystemNotificationListener();
     IonList,
     IonItem,
     IonLabel
-],
+  ],
 })
 export class AppComponent implements OnInit {
-  notifications: SystemNotification[] = [];
-  notificationListener!: PluginListenerHandle;
-  notificationRemovedListener!: PluginListenerHandle;
-
   private readonly cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
-  constructor() {}
+  // private readonly socketService: SocketService = inject(SocketService);
+  private readonly androidNotificationListenerService: AndroidNotificationListenerService = inject(AndroidNotificationListenerService);
+  // private readonly androidBackgroundRunnerService: AndroidBackgroundRunnerService = inject(AndroidBackgroundRunnerService);
+  private readonly platform: Platform = inject(Platform);
+
+  notifications$: Observable<SystemNotification> = this.androidNotificationListenerService.notifications$.pipe(
+    filter((notification) => !!notification),
+    distinctUntilChanged(compareObjects),
+  );
+
+  notifications: SystemNotification[] = [];
 
   ngOnInit() {
-    this.checkPermissionsAndStartListening();
+    const isAndroid = this.platform.is('android');
+    if(isAndroid) this.checkPermissionsAndStartListening();
   }
 
   async checkPermissionsAndStartListening() {
-    const isListening = await sn.isListening();
-    if (!isListening) {
-      await sn.requestPermission();
-    }
-    this.startListening();
-  }
-
-  async startListening() {
-    await sn.startListening();
-
-    this.notificationListener = sn.addListener('notificationReceivedEvent', (notification: SystemNotification) => {
+    this.androidNotificationListenerService.checkPermissionsAndStartListening();
+    this.notifications$.subscribe((notification) => {
       this.notifications.push(notification);
+      this.notifications = [...this.notifications];
+      console.log('Notifications:', this.notifications);
+      
       this.cdr.detectChanges();
-      console.log('Notification received:', notification);
     });
-
-    this.notificationRemovedListener = sn.addListener('notificationRemovedEvent', (notification: SystemNotification) => {
-      console.log('Notification removed:', notification);
-      // You can add logic here to remove the notification from the list if needed
-    });
-  }
-
-  async stopListening() {
-    await sn.stopListening();
-    if (this.notificationListener) {
-      this.notificationListener.remove();
-    }
-
-    if (this.notificationRemovedListener) {
-      this.notificationRemovedListener.remove();
-    }
   }
 }

@@ -10,13 +10,15 @@
   <ion-content>
     Something changed in the notifications array
     <ion-list>
-      <ion-item *ngFor="let notification of notifications">
-        <ion-label>
-          <h2>Package: {{ notification.package }}</h2>
-          <p>App Title: {{ notification.apptitle }}</p>
-          <p>Text: {{ notification.text }}</p>
-        </ion-label>
-      </ion-item>
+      @for (notification of notifications; track $index) {
+        <ion-item>
+          <ion-label>
+            <h2>Package: {{ notification.package }}</h2>
+            <p>App Title: {{ notification.apptitle }}</p>
+            <p>Text: {{ notification.text }}</p>
+          </ion-label>
+        </ion-item>
+      }
     </ion-list>
   </ion-content>
 </ion-app>

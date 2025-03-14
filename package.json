@@ -7,6 +7,7 @@
     "ng": "ng",
     "start": "ionic serve --open",
     "build": "ionic build",
+    "build:prod": "ionic build --configuration production",
     "watch": "ionic build --watch --configuration development",
     "test": "ionic test",
     "lint": "ionic lint"
@@ -24,10 +25,12 @@
     "@capacitor/android": "^5.7.8",
     "@capacitor/cli": "^5.7.8",
     "@capacitor/core": "^5.7.8",
+    "@capawesome-team/capacitor-android-foreground-service": "^7.0.1",
     "@ionic/angular": "^8.0.0",
     "capacitor4-notificationlistener": "^0.0.1",
     "ionicons": "^7.0.0",
     "rxjs": "~7.8.0",
+    "socket.io-client": "^4.7.5",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
   },
