@@ -13,7 +13,7 @@ import { SocketService } from 'src/app/shared/service/socket.service';
 import { StringAnalysisUtil } from 'src/app/shared/utitl/string-analysis.utitl';
 
 //Rxjs
-import { BehaviorSubject, distinctUntilChanged, filter, map, Observable, of, Subscription, switchMap } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, filter, map, Observable, of, Subscription, switchMap, tap } from 'rxjs';
 import { NotificationConfigurationPage } from 'src/app/shared/page/home/notification-configuration/notification-configuration.page';
 import { INotificatonConfiguration } from 'src/app/shared/interface/notificaton-configuration.interface';
 
@@ -21,8 +21,6 @@ import { INotificatonConfiguration } from 'src/app/shared/interface/notificaton-
 const compareObjects = (prev: any, curr: any) => {
   return JSON.stringify(prev) === JSON.stringify(curr);
 };
-
-const defaultNotificationPackage: string = 'com.VCB';
 
 @Component({
   selector: 'app-home',
@@ -59,16 +57,17 @@ export class HomePage implements OnInit, OnDestroy {
 
   private readonly modalCtrl: ModalController = inject(ModalController);
 
-  notificationPackage$: BehaviorSubject<string | null> = new BehaviorSubject<string | null>('');
+  notificationPackage$: BehaviorSubject<string | 'all' | null> = new BehaviorSubject<string | 'all' | null>('all');
 
   private readonly notifications$: Observable<SystemNotification> = this.androidNotificationListenerService.notifications$.pipe(
     filter((notification) => !!notification),
     distinctUntilChanged(compareObjects),
     //Filter value thêm notificationPackage$ để lọc ra thông báo từ ứng dụng cần
     switchMap(notification => this.notificationPackage$.pipe(
+      tap((notificationPackage) => console.log('Notification:', notificationPackage)),
       filter(notificationPackage => notificationPackage != null),
       filter(notificationPackage =>{
-        if(notificationPackage === ''){
+        if(notificationPackage === 'all'){
           return true;
         }else{
           return notification.package === notificationPackage
@@ -86,6 +85,7 @@ export class HomePage implements OnInit, OnDestroy {
     const isAndroid = this.platform.is('android');
     await this.checkPackageStorage();
     if (isAndroid) this.checkPermissionsAndStartListening();
+    this.listenNotification();
   }
 
   private async checkPackageStorage() {
@@ -110,7 +110,8 @@ export class HomePage implements OnInit, OnDestroy {
       const notificatonConfiguration: INotificatonConfiguration = dataWillDismiss.data;
       const role: 'confirm' | 'cancel' = dataWillDismiss.role as 'confirm' | 'cancel';
       if (role === 'confirm') {
-        const packageName = notificatonConfiguration.packageName;
+        let packageName = notificatonConfiguration.packageName;
+        if(packageName === '') packageName = 'all';
         this.notificationPackage$.next(packageName);
         await this.storageService.setItem('notificationPackage', packageName);
       }
@@ -119,22 +120,23 @@ export class HomePage implements OnInit, OnDestroy {
 
   private async checkPermissionsAndStartListening() {
     await this.androidNotificationListenerService.checkPermissionsAndStartListening();
+  }
+
+  private listenNotification() {
     this.subscription.add(
       this.notifications$.subscribe((notification) => {
         this.notifications.push(notification);
         this.notifications = [...this.notifications];
+        this.cdr.detectChanges();
 
         const notificationText = notification.text;
-
         const allAmounts = StringAnalysisUtil.extractMonetaryAmounts(notificationText);
         const convertToIntegers = StringAnalysisUtil.convertToIntegers(allAmounts);
-        const amount = convertToIntegers[0];
 
+        if (convertToIntegers.length === 0) return;
+        const amount = convertToIntegers[0];
         this.socketService.sendMessage('the-new-payment', { amount });
 
-        console.log('Notifications:', this.notifications);
-
-        this.cdr.detectChanges();
       })
     )
   }

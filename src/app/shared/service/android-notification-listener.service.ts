@@ -1,14 +1,15 @@
 import { Injectable } from '@angular/core';
 import { PluginListenerHandle } from '@capacitor/core';
 import { SystemNotification, SystemNotificationListener } from 'capacitor4-notificationlistener';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 const sn = new SystemNotificationListener();
 
 @Injectable({
   providedIn: 'root'
 })
 export class AndroidNotificationListenerService {
-  notifications$: BehaviorSubject<SystemNotification> = new BehaviorSubject<SystemNotification>(null as any);
+  private readonly notificationsSubject: BehaviorSubject<SystemNotification> = new BehaviorSubject<SystemNotification>(null as any);
+  notifications$: Observable<SystemNotification> = this.notificationsSubject.asObservable();
 
   private notificationListener!: PluginListenerHandle;
   private notificationRemovedListener!: PluginListenerHandle;
@@ -27,7 +28,7 @@ export class AndroidNotificationListenerService {
 
     this.notificationListener = sn.addListener('notificationReceivedEvent', (notification: SystemNotification) => {
       console.log('Notification received:', notification);
-      this.notifications$.next(notification);
+      this.notificationsSubject.next(notification);
     });
 
     this.notificationRemovedListener = sn.addListener('notificationRemovedEvent', (notification: SystemNotification) => {

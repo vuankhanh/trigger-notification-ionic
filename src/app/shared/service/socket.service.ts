@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
-import { environment } from 'src/environments/environment';
 import { NetworkAdress } from '../interface/server-configuration.interface';
 @Injectable({
   providedIn: 'root'
@@ -13,52 +12,50 @@ export class SocketService {
   constructor() { }
 
   setServerAddress({ protocol, ipOrDomain, port = 80 }: NetworkAdress): void {
+    this.disconnect();
 
     const serverAddress = `${protocol}://${ipOrDomain}:${port}`;
-
     this.socket = io(serverAddress, {
-      transports: ['websocket'],
-      withCredentials: true
+      transports: ['websocket']
     });
+    this.connect();
   }
 
-  connect(): void {
-    if (this.socket) {
-      this.socket.on('connect', () => {
-        console.log('Connected to Socket.IO server');
-        this.socketStatusSubject.next(EnumSocketEvent.Connect);
-      });
+  private connect(): void {
+    this.socket.on('connect', () => {
+      console.log('Connected to Socket.IO server');
+      this.socketStatusSubject.next(EnumSocketEvent.Connect);
+    });
 
-      this.socket.on('disconnect', () => {
-        console.log('Disconnected from Socket.IO server');
-        this.socketStatusSubject.next(EnumSocketEvent.Disconnect);
-      });
+    this.socket.on('disconnect', () => {
+      console.log('Disconnected from Socket.IO server');
+      this.socketStatusSubject.next(EnumSocketEvent.Disconnect);
+    });
 
-      this.socket.on('connect_error', (error) => {
-        console.error('Socket.IO connection error:', error);
-        this.socketStatusSubject.next(EnumSocketEvent.ConnectError);
-      });
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket.IO connection error:', error);
+      this.socketStatusSubject.next(EnumSocketEvent.ConnectError);
+    });
 
-      this.socket.on('connect_timeout', (timeout) => {
-        console.error('Socket.IO connection timeout:', timeout);
-        this.socketStatusSubject.next(EnumSocketEvent.ConnectTimeout);
-      });
+    this.socket.on('connect_timeout', (timeout) => {
+      console.error('Socket.IO connection timeout:', timeout);
+      this.socketStatusSubject.next(EnumSocketEvent.ConnectTimeout);
+    });
 
-      this.socket.on('error', (error) => {
-        console.error('Socket.IO error:', error);
-        this.socketStatusSubject.next(EnumSocketEvent.Error);
-      });
+    this.socket.on('error', (error) => {
+      console.error('Socket.IO error:', error);
+      this.socketStatusSubject.next(EnumSocketEvent.Error);
+    });
 
-      this.socket.on('reconnect_attempt', () => {
-        console.log('Socket.IO reconnect attempt');
-        this.socketStatusSubject.next(EnumSocketEvent.ReconnectAttempt);
-      });
+    this.socket.on('reconnect_attempt', () => {
+      console.log('Socket.IO reconnect attempt');
+      this.socketStatusSubject.next(EnumSocketEvent.ReconnectAttempt);
+    });
 
-      this.socket.on('reconnect_failed', () => {
-        console.error('Socket.IO reconnect failed');
-        this.socketStatusSubject.next(EnumSocketEvent.ReconnectFailed);
-      });
-    }
+    this.socket.on('reconnect_failed', () => {
+      console.error('Socket.IO reconnect failed');
+      this.socketStatusSubject.next(EnumSocketEvent.ReconnectFailed);
+    });
   }
 
   disconnect(): void {

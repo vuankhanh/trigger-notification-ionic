@@ -62,7 +62,6 @@ export class AppComponent implements OnInit {
     this.serverAddress$.subscribe((serverAddress) => {
       if (serverAddress){
         this.socketService.setServerAddress(serverAddress);
-        this.socketService.connect();
       }
     });
   }
