@@ -1,0 +1,32 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button color="medium" (click)="cancel()">Hủy</ion-button>
+    </ion-buttons>
+    <ion-title>Cấu hình</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="confirm()" [strong]="true">Xác nhận</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-header collapse="condense">
+    <ion-toolbar>
+      <ion-title size="large">notification-configuration</ion-title>
+    </ion-toolbar>
+  </ion-header>
+
+  @if(notificationPackageForm){
+  <form [formGroup]="notificationPackageForm">
+    <ion-list>
+      <ion-item>
+        <ion-input label="Tên Package cần lắng nghe" labelPlacement="stacked" formControlName="packageName"
+          placeholder="Nhập tên Package">
+        </ion-input>
+      </ion-item>
+    </ion-list>
+  </form>
+  }
+
+</ion-content>

@@ -1,0 +1,23 @@
+@if (serverConfigurationGroup) {
+<form [formGroup]="serverConfigurationGroup" (ngSubmit)="onSubmit()">
+  <ion-item>
+    <ion-label position="stacked">Giao thức</ion-label>
+    <ion-select formControlName="protocol">
+      <ion-select-option value="http">http</ion-select-option>
+      <ion-select-option value="https">https</ion-select-option>
+    </ion-select>
+  </ion-item>
+
+  <ion-item>
+    <ion-label position="stacked">Ip/Tên miền</ion-label>
+    <ion-input formControlName="ipOrDomain" type="text"></ion-input>
+  </ion-item>
+
+  <ion-item>
+    <ion-label position="stacked">Cổng</ion-label>
+    <ion-input formControlName="port" type="number"></ion-input>
+  </ion-item>
+
+  <ion-button type="submit" [disabled]="serverConfigurationGroup.invalid">Cập nhật</ion-button>
+</form>
+}

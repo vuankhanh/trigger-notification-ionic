@@ -19,7 +19,7 @@ export class AndroidNotificationListenerService {
     if (!isListening) {
       await sn.requestPermission();
     }
-    this.startListening();
+    await this.startListening();
   }
 
   async startListening() {

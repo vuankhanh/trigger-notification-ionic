@@ -1,20 +1,42 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-title>
-      Blank
+      Home
     </ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Blank</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  @if (notificationPackage$ | async; as notificationPackage) {
+    <ion-list>
+      <ion-list-header>
+        @if (notificationPackage) {
+          <ion-label>Danh sách thông báo của {{ notificationPackage }}</ion-label>
+        }@else{
+          <ion-label>Danh sách tất cả các thông báo</ion-label>
+        }
+      </ion-list-header>
+      @for (notification of notifications; track $index) {
+      <ion-item>
+        <ion-label>
+          <h2>Package: {{ notification.package }}</h2>
+          <p>App Title: {{ notification.apptitle }}</p>
+          <p>Text: {{ notification.text }}</p>
+        </ion-label>
+      </ion-item>
+      }
+    </ion-list>
+  }
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Card Title</ion-card-title>
+      <ion-card-subtitle>Card Subtitle</ion-card-subtitle>
+    </ion-card-header>
 
-  <div id="container">
-    <strong>Ready to create an app?</strong>
-    <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
-  </div>
+    <ion-card-content>
+      <ion-button (click)="startForcegroundService()">Bắt đầu chạy ForceBackground Service</ion-button>
+      <!-- <p *ngIf="isBackgroundServiceRunning">Background service is running</p>
+      <p *ngIf="!isBackgroundServiceRunning">Background service is not running</p> -->
+    </ion-card-content>
+  </ion-card>
 </ion-content>

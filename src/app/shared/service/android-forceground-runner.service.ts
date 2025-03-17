@@ -4,7 +4,7 @@ import { ForegroundService, Importance } from '@capawesome-team/capacitor-androi
 @Injectable({
   providedIn: 'root'
 })
-export class AndroidBackgroundRunnerService {
+export class AndroidForcegroundRunnerService {
 
   startForegroundService = async () => {
     await ForegroundService.startForegroundService({
