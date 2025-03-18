@@ -26,16 +26,17 @@
     "@capacitor/android": "^5.7.8",
     "@capacitor/cli": "^5.7.8",
     "@capacitor/core": "^5.7.8",
+    "@capacitor/local-notifications": "^5.0.8",
     "@capacitor/preferences": "^5.0.8",
     "@capawesome-team/capacitor-android-foreground-service": "^7.0.1",
     "@ionic/angular": "^7.8.6",
+    "@stencil/core": "^3.3.0",
     "capacitor4-notificationlistener": "^0.0.1",
     "ionicons": "^7.0.0",
     "rxjs": "~7.8.0",
     "socket.io-client": "^4.7.5",
     "tslib": "^2.3.0",
-    "zone.js": "~0.15.0",
-    "@stencil/core": "^3.3.0"
+    "zone.js": "~0.15.0"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^17.0.0",

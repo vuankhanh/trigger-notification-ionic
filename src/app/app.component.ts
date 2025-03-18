@@ -3,7 +3,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
 import { homeOutline, homeSharp, settingsOutline, settingsSharp } from 'ionicons/icons';
-import { SocketService, socketStatusMessages } from './shared/service/socket.service';
+import { ServerConfigurationStorageService, SocketService, socketStatusMessages } from './shared/service/socket.service';
 import { StorageService } from './shared/service/storage.service';
 
 import { BehaviorSubject, map } from 'rxjs';
@@ -38,7 +38,7 @@ import { IonItem, IonApp, IonSplitPane, IonMenu, IonContent, IonList, IonMenuTog
 })
 export class AppComponent implements OnInit {
   private readonly socketService: SocketService = inject(SocketService);
-  private readonly storageService: StorageService = inject(StorageService);
+  private readonly serverConfigurationStorageService: ServerConfigurationStorageService = inject(ServerConfigurationStorageService);
 
   private readonly serverAddressSubject: BehaviorSubject<NetworkAdress | null> = new BehaviorSubject<NetworkAdress | null>(null);
   serverAddress$ = this.serverAddressSubject.asObservable();
@@ -58,7 +58,6 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.setServerAddress();
-    // this.socketService.connect();
     this.serverAddress$.subscribe((serverAddress) => {
       if (serverAddress){
         this.socketService.setServerAddress(serverAddress);
@@ -67,44 +66,15 @@ export class AppComponent implements OnInit {
   }
 
   private async setServerAddress() {
-    const serverConfiguration = await this.getServerConfigurationStorage();
+    const serverConfiguration = await this.serverConfigurationStorageService.getServerConfigurationStorage();
     if (serverConfiguration) {
       this.serverAddressSubject.next(serverConfiguration.address);
     }
   }
 
-  private async getServerConfigurationStorage(): Promise<ServerConfiguration | null> {
-    const serverConfigurationStorage = await this.storageService.getItem('serverConfiguration');
-    if (serverConfigurationStorage) {
-      try {
-        return JSON.parse(serverConfigurationStorage) as ServerConfiguration;
-      } catch (error) {
-        console.error('Error parsing server configuration:', error);
-        return null;
-      }
-    }else {
-      return null;
-    }
-  }
-
   handleServerAddress(serverAddress: NetworkAdress) {
     this.serverAddressSubject.next(serverAddress);
-    this.updateServerConfiguration({ address: serverAddress });
-  }
-
-  async updateServerConfiguration(newConfig: Partial<ServerConfiguration>) {
-    let serverAddress = await this.getServerConfigurationStorage();
-    console.log(serverAddress);
-    
-    if(serverAddress) {
-      serverAddress = {
-        ...serverAddress,
-        ...newConfig
-      };
-    }else{
-      serverAddress = newConfig as ServerConfiguration;
-    }
-    await this.storageService.setItem('serverConfiguration', JSON.stringify(serverAddress));
+    this.serverConfigurationStorageService.updateServerConfiguration({ address: serverAddress });
   }
 
   resetServerAddress(){

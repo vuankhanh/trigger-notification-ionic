@@ -57,6 +57,7 @@ export class HomePage implements OnInit, OnDestroy {
 
   private readonly modalCtrl: ModalController = inject(ModalController);
 
+  forcegroundServiceStatus$: Observable<boolean> = this.androidForcegroundRunnerService.forcegroundServiceStatus$;
   notificationPackage$: BehaviorSubject<string | 'all' | null> = new BehaviorSubject<string | 'all' | null>('all');
 
   private readonly notifications$: Observable<SystemNotification> = this.androidNotificationListenerService.notifications$.pipe(
@@ -81,11 +82,12 @@ export class HomePage implements OnInit, OnDestroy {
 
   private readonly subscription: Subscription = new Subscription();
 
-  async ngOnInit() {
-    const isAndroid = this.platform.is('android');
-    await this.checkPackageStorage();
-    if (isAndroid) this.checkPermissionsAndStartListening();
-    this.listenNotification();
+  async ngOnInit() {}
+  
+  async ionViewDidEnter() {
+    await this.androidForcegroundRunnerService.checkPermissionAndRequestIfNotGranted();
+    await this.androidForcegroundRunnerService.createNotificationChannel();
+    await this.startForcegroundService();
   }
 
   private async checkPackageStorage() {
@@ -136,15 +138,23 @@ export class HomePage implements OnInit, OnDestroy {
         if (convertToIntegers.length === 0) return;
         const amount = convertToIntegers[0];
         this.socketService.sendMessage('the-new-payment', { amount });
-
       })
     )
   }
 
   async startForcegroundService() {
     await this.androidForcegroundRunnerService.startForegroundService();
+    const isAndroid = this.platform.is('android');
+    await this.checkPackageStorage();
+    if (isAndroid) this.checkPermissionsAndStartListening();
+    this.listenNotification();
   }
 
+  async stopForcegroundService() {
+    await this.androidForcegroundRunnerService.stopForegroundService();
+    this.subscription.unsubscribe();
+  }
+  
   ngOnDestroy() {
     this.subscription.unsubscribe();
   }

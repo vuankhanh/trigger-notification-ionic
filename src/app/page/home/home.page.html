@@ -29,14 +29,22 @@
   }
   <ion-card>
     <ion-card-header>
-      <ion-card-title>Card Title</ion-card-title>
-      <ion-card-subtitle>Card Subtitle</ion-card-subtitle>
+      <ion-card-title>Dịch vụ Forceground</ion-card-title>
+      <ion-card-subtitle>
+        @if (forcegroundServiceStatus$ | async; as forcegroundServiceStatus) {
+          Dịch vụ Forceground đang chạy
+        }@else {
+          Dịch vụ Forceground không chạy
+        }
+      </ion-card-subtitle>
     </ion-card-header>
 
     <ion-card-content>
-      <ion-button (click)="startForcegroundService()">Bắt đầu chạy ForceBackground Service</ion-button>
-      <!-- <p *ngIf="isBackgroundServiceRunning">Background service is running</p>
-      <p *ngIf="!isBackgroundServiceRunning">Background service is not running</p> -->
+      @if (forcegroundServiceStatus$ | async; as forcegroundServiceStatus) {
+        <ion-button (click)="stopForcegroundService()">Dừng chạy ForceBackground Service</ion-button>
+      }@else {
+        <ion-button (click)="startForcegroundService()">Bắt đầu chạy ForceBackground Service</ion-button>
+      }
     </ion-card-content>
   </ion-card>
 </ion-content>

@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
-import { NetworkAdress } from '../interface/server-configuration.interface';
+import { NetworkAdress, ServerConfiguration } from '../interface/server-configuration.interface';
+import { StorageService } from './storage.service';
 @Injectable({
   providedIn: 'root'
 })
@@ -76,6 +77,42 @@ export class SocketService {
         observer.next(data);
       });
     });
+  }
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ServerConfigurationStorageService {
+  private readonly storageService: StorageService = inject(StorageService);
+  
+  async getServerConfigurationStorage(): Promise<ServerConfiguration | null> {
+    const serverConfigurationStorage = await this.storageService.getItem('serverConfiguration');
+    if (serverConfigurationStorage) {
+      try {
+        return JSON.parse(serverConfigurationStorage) as ServerConfiguration;
+      } catch (error) {
+        console.error('Error parsing server configuration:', error);
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  async updateServerConfiguration(newConfig: Partial<ServerConfiguration>) {
+    let serverAddress = await this.getServerConfigurationStorage();
+    console.log(serverAddress);
+    
+    if(serverAddress) {
+      serverAddress = {
+        ...serverAddress,
+        ...newConfig
+      };
+    }else{
+      serverAddress = newConfig as ServerConfiguration;
+    }
+    await this.storageService.setItem('serverConfiguration', JSON.stringify(serverAddress));
   }
 }
 

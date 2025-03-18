@@ -41,11 +41,6 @@ export class ServerConfigurationComponent  implements OnInit {
       ipOrDomain: [this.data?.ipOrDomain || '', Validators.required],
       port: [this.data?.port || '', Validators.required],
     });
-
-    this.serverConfigurationGroup.valueChanges.subscribe((value) => {
-      console.log(value);
-      
-    })
   }
 
   onSubmit() {

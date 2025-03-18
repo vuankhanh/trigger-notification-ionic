@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'trigger-notification-ionic',
   webDir: 'www',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'http'
   },
   android: {
     allowMixedContent: true
