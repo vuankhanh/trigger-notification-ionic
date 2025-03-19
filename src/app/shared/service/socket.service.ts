@@ -10,6 +10,7 @@ export class SocketService {
   private socket!: Socket;
   private socketStatusSubject: BehaviorSubject<TSocketEvent> = new BehaviorSubject<TSocketEvent>(EnumSocketEvent.Disconnect);
   public socketStatus$: Observable<TSocketEvent> = this.socketStatusSubject.asObservable();
+  
   constructor() { }
 
   setServerAddress({ protocol, ipOrDomain, port = 80 }: NetworkAdress): void {
@@ -71,7 +72,7 @@ export class SocketService {
     }
   }
 
-  listen(event: string): Observable<any> {
+  private listen(event: string): Observable<any> {
     return new Observable((observer) => {
       this.socket.on(event, (data) => {
         observer.next(data);
@@ -116,7 +117,7 @@ export class ServerConfigurationStorageService {
   }
 }
 
-const enum EnumSocketEvent {
+export const enum EnumSocketEvent {
   Connect = 'connect',
   Disconnect = 'disconnect',
   ConnectError = 'connect_error',

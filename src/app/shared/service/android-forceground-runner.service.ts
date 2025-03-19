@@ -1,13 +1,18 @@
 import { inject, Injectable } from '@angular/core';
-import { ForegroundService, Importance } from '@capawesome-team/capacitor-android-foreground-service';
-import { BehaviorSubject } from 'rxjs';
+import { ButtonClickedEvent, ForegroundService, Importance } from '@capawesome-team/capacitor-android-foreground-service';
+import { KeepAwake } from '@capacitor-community/keep-awake';
 import { AndroidLocalNotificationService } from './android-local-notification.service';
+import { EnumSocketEvent, SocketService, TSocketEvent } from './socket.service';
+
+import { BehaviorSubject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AndroidForcegroundRunnerService {
+  private readonly socketService: SocketService = inject(SocketService);
   private readonly androidLocalNotificationService: AndroidLocalNotificationService = inject(AndroidLocalNotificationService);
+
   private readonly forcegroundServiceStatusSubject: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   forcegroundServiceStatus$ = this.forcegroundServiceStatusSubject.asObservable();
 
@@ -19,27 +24,19 @@ export class AndroidForcegroundRunnerService {
     }
   }
 
-  startForegroundService = async () => {
+  startForegroundService = async (socketStatus: string) => {
     if (!this.forcegroundServiceStatusSubject.value) {
       console.log('Starting Foreground Service...');
       await ForegroundService.startForegroundService({
         id: 1,
         title: 'Dịch vụ Trigger Notification',
-        body: 'Dịch vụ đang được chạy trong Forceground',
+        body: `Trạng thái kết nối: ${socketStatus}`,
         smallIcon: 'ic_hardware',
-        buttons: [
-          {
-            title: 'Button 1',
-            id: 1,
-          },
-          {
-            title: 'Button 2',
-            id: 2,
-          },
-        ],
         silent: false,
         notificationChannelId: 'default',
       });
+      // Giữ thiết bị hoạt động
+      await KeepAwake.keepAwake();
       this.forcegroundServiceStatusSubject.next(true);
       console.log('Foreground Service started.');
     } else {
@@ -47,19 +44,23 @@ export class AndroidForcegroundRunnerService {
       return;
     }
   };
-  
-  // updateForegroundService = async () => {
-  //   await ForegroundService.updateForegroundService({
-  //     id: 1,
-  //     title: 'Title',
-  //     body: 'Body',
-  //     smallIcon: 'ic_hardware',
-  //   });
-  // };
+
+  updateForcegroundBodyNotification = async (socketStatus: string) => {
+    await ForegroundService.updateForegroundService({
+      id: 1,
+        title: 'Dịch vụ Trigger Notification',
+        body: `Trạng thái kết nối: ${socketStatus}`,
+        smallIcon: 'ic_hardware',
+        silent: false,
+        notificationChannelId: 'default',
+    });
+  };
   
   stopForegroundService = async () => {
     if (this.forcegroundServiceStatusSubject.value) {
       await ForegroundService.stopForegroundService();
+      // Tắt chế độ giữ thiết bị hoạt động
+      await KeepAwake.allowSleep();
       this.forcegroundServiceStatusSubject.next(false);
       console.log('Foreground Service stopped.');
     } else {

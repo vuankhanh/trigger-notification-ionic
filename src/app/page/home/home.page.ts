@@ -7,13 +7,13 @@ import { SystemNotification } from 'capacitor4-notificationlistener';
 import { StorageService } from 'src/app/shared/service/storage.service';
 import { AndroidNotificationListenerService } from 'src/app/shared/service/android-notification-listener.service';
 import { AndroidForcegroundRunnerService } from 'src/app/shared/service/android-forceground-runner.service';
-import { SocketService } from 'src/app/shared/service/socket.service';
+import { SocketService, socketStatusMessages } from 'src/app/shared/service/socket.service';
 
 //Util
 import { StringAnalysisUtil } from 'src/app/shared/utitl/string-analysis.utitl';
 
 //Rxjs
-import { BehaviorSubject, distinctUntilChanged, filter, map, Observable, of, Subscription, switchMap, tap } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, filter, lastValueFrom, map, Observable, of, Subscription, switchMap, take, tap } from 'rxjs';
 import { NotificationConfigurationPage } from 'src/app/shared/page/home/notification-configuration/notification-configuration.page';
 import { INotificatonConfiguration } from 'src/app/shared/interface/notificaton-configuration.interface';
 
@@ -29,7 +29,7 @@ const compareObjects = (prev: any, curr: any) => {
   standalone: true,
   imports: [
     CommonModule,
-    
+
     IonHeader,
     IonButton,
     IonCardContent,
@@ -60,6 +60,18 @@ export class HomePage implements OnInit, OnDestroy {
   forcegroundServiceStatus$: Observable<boolean> = this.androidForcegroundRunnerService.forcegroundServiceStatus$;
   notificationPackage$: BehaviorSubject<string | 'all' | null> = new BehaviorSubject<string | 'all' | null>('all');
 
+  private socketStatus$ = this.socketService.socketStatus$.pipe(
+    map((status) => socketStatusMessages[status]),
+    distinctUntilChanged()
+  );
+
+  private socketChangedAfterForcegroundServiceStart$: Observable<string> = this.socketStatus$.pipe(
+    switchMap((status) => this.androidForcegroundRunnerService.forcegroundServiceStatus$.pipe(
+      filter((status) => !!status),
+      map(() => status)
+    ))
+  );
+
   private readonly notifications$: Observable<SystemNotification> = this.androidNotificationListenerService.notifications$.pipe(
     filter((notification) => !!notification),
     distinctUntilChanged(compareObjects),
@@ -67,10 +79,10 @@ export class HomePage implements OnInit, OnDestroy {
     switchMap(notification => this.notificationPackage$.pipe(
       tap((notificationPackage) => console.log('Notification:', notificationPackage)),
       filter(notificationPackage => notificationPackage != null),
-      filter(notificationPackage =>{
-        if(notificationPackage === 'all'){
+      filter(notificationPackage => {
+        if (notificationPackage === 'all') {
           return true;
-        }else{
+        } else {
           return notification.package === notificationPackage
         }
       }),
@@ -82,12 +94,17 @@ export class HomePage implements OnInit, OnDestroy {
 
   private readonly subscription: Subscription = new Subscription();
 
-  async ngOnInit() {}
-  
+  async ngOnInit() { }
+
   async ionViewDidEnter() {
-    await this.androidForcegroundRunnerService.checkPermissionAndRequestIfNotGranted();
-    await this.androidForcegroundRunnerService.createNotificationChannel();
-    await this.startForcegroundService();
+    const forcegroundServiceStatusPromise: Promise<boolean> = lastValueFrom(this.forcegroundServiceStatus$.pipe(
+      take(1)
+    ));
+    const forcegroundServiceStatus = await forcegroundServiceStatusPromise;
+    if (!forcegroundServiceStatus) {
+      await this.startForcegroundService();
+      this.listenOnSocketStatusAfterForcegroundServiceStart();
+    };
   }
 
   private async checkPackageStorage() {
@@ -113,7 +130,7 @@ export class HomePage implements OnInit, OnDestroy {
       const role: 'confirm' | 'cancel' = dataWillDismiss.role as 'confirm' | 'cancel';
       if (role === 'confirm') {
         let packageName = notificatonConfiguration.packageName;
-        if(packageName === '') packageName = 'all';
+        if (packageName === '') packageName = 'all';
         this.notificationPackage$.next(packageName);
         await this.storageService.setItem('notificationPackage', packageName);
       }
@@ -143,7 +160,11 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   async startForcegroundService() {
-    await this.androidForcegroundRunnerService.startForegroundService();
+    const socketStatusPromise: Promise<string> = lastValueFrom(this.socketStatus$.pipe(take(1)));
+    const status = await socketStatusPromise;
+    await this.androidForcegroundRunnerService.checkPermissionAndRequestIfNotGranted();
+    await this.androidForcegroundRunnerService.createNotificationChannel();
+    await this.androidForcegroundRunnerService.startForegroundService(status);
     const isAndroid = this.platform.is('android');
     await this.checkPackageStorage();
     if (isAndroid) this.checkPermissionsAndStartListening();
@@ -154,7 +175,15 @@ export class HomePage implements OnInit, OnDestroy {
     await this.androidForcegroundRunnerService.stopForegroundService();
     this.subscription.unsubscribe();
   }
-  
+
+  private listenOnSocketStatusAfterForcegroundServiceStart() {
+    this.subscription.add(
+      this.socketChangedAfterForcegroundServiceStart$.subscribe((status) => {
+       this.androidForcegroundRunnerService.updateForcegroundBodyNotification(status);
+      })
+    )
+  }
+
   ngOnDestroy() {
     this.subscription.unsubscribe();
   }

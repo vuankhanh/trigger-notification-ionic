@@ -4,7 +4,6 @@ import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
 import { homeOutline, homeSharp, settingsOutline, settingsSharp } from 'ionicons/icons';
 import { ServerConfigurationStorageService, SocketService, socketStatusMessages } from './shared/service/socket.service';
-import { StorageService } from './shared/service/storage.service';
 
 import { BehaviorSubject, map } from 'rxjs';
 import { NetworkAdress, ServerConfiguration } from './shared/interface/server-configuration.interface';
