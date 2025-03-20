@@ -1,16 +1,16 @@
 import { inject, Injectable } from '@angular/core';
-import { ButtonClickedEvent, ForegroundService, Importance } from '@capawesome-team/capacitor-android-foreground-service';
+import { ForegroundService, Importance } from '@capawesome-team/capacitor-android-foreground-service';
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { AndroidLocalNotificationService } from './android-local-notification.service';
-import { EnumSocketEvent, SocketService, TSocketEvent } from './socket.service';
 
 import { BehaviorSubject } from 'rxjs';
+import { AndroidBatteryOptimizationService } from './android-battery-optimization.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AndroidForcegroundRunnerService {
-  private readonly socketService: SocketService = inject(SocketService);
+  private readonly androidBatteryOptimizationService: AndroidBatteryOptimizationService = inject(AndroidBatteryOptimizationService);
   private readonly androidLocalNotificationService: AndroidLocalNotificationService = inject(AndroidLocalNotificationService);
 
   private readonly forcegroundServiceStatusSubject: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
@@ -35,8 +35,10 @@ export class AndroidForcegroundRunnerService {
         silent: false,
         notificationChannelId: 'default',
       });
-      // Giữ thiết bị hoạt động
+      // Giữ màn hình thiết bị không tắt
       await KeepAwake.keepAwake();
+      // Tắt chế độ tối ưu pin
+      this.androidBatteryOptimizationService.requestIgnoreBatteryOptimization();
       this.forcegroundServiceStatusSubject.next(true);
       console.log('Foreground Service started.');
     } else {
@@ -59,8 +61,10 @@ export class AndroidForcegroundRunnerService {
   stopForegroundService = async () => {
     if (this.forcegroundServiceStatusSubject.value) {
       await ForegroundService.stopForegroundService();
-      // Tắt chế độ giữ thiết bị hoạt động
+      // Cho phép thiết bị ngủ
       await KeepAwake.allowSleep();
+      // Mở chế độ tối ưu pin
+      this.androidBatteryOptimizationService.openBatteryOptimizationSettings();
       this.forcegroundServiceStatusSubject.next(false);
       console.log('Foreground Service stopped.');
     } else {

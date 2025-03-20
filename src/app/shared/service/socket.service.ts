@@ -1,8 +1,9 @@
 import { inject, Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, interval, Observable, Subject, takeUntil } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { NetworkAdress, ServerConfiguration } from '../interface/server-configuration.interface';
 import { StorageService } from './storage.service';
+import { DatePipe } from '@angular/common';
 @Injectable({
   providedIn: 'root'
 })
@@ -10,17 +11,28 @@ export class SocketService {
   private socket!: Socket;
   private socketStatusSubject: BehaviorSubject<TSocketEvent> = new BehaviorSubject<TSocketEvent>(EnumSocketEvent.Disconnect);
   public socketStatus$: Observable<TSocketEvent> = this.socketStatusSubject.asObservable();
-  
+
+  private readonly datePipe: DatePipe = inject(DatePipe);
+  private destroy$: Subject<void> = new Subject<void>(); // Subject để dừng luồng RxJS
   constructor() { }
 
-  setServerAddress({ protocol, ipOrDomain, port = 80 }: NetworkAdress): void {
-    this.disconnect();
+  get socketStatus(): TSocketEvent {
+    return this.socketStatusSubject.getValue();
+  }
 
+  setServerAddress({ protocol, ipOrDomain, port = 80 }: NetworkAdress): void {
     const serverAddress = `${protocol}://${ipOrDomain}:${port}`;
     this.socket = io(serverAddress, {
-      transports: ['websocket']
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      timeout: 20000
     });
     this.connect();
+
+    // Bắt đầu gửi ping mỗi 2 phút
+    this.startPing();
   }
 
   private connect(): void {
@@ -58,12 +70,39 @@ export class SocketService {
       console.error('Socket.IO reconnect failed');
       this.socketStatusSubject.next(EnumSocketEvent.ReconnectFailed);
     });
+
+    // Lắng nghe sự kiện 'pong' từ server
+    this.socket.on('pong', (time: string) => {
+      console.log('Pong received from server:', time);
+    });
+  }
+
+  private startPing(): void {
+    interval(10000) // Phát sự kiện mỗi 2 phút (120000ms)
+      .pipe(takeUntil(this.destroy$)) // Dừng luồng khi nhận tín hiệu từ `destroy$`
+      .subscribe(() => {
+        if (this.socket && this.socket.connected) {
+          const time = this.datePipe.transform(new Date(), 'dd/MM/yyyy HH:mm:ss');
+          this.socket.emit('ping', time);
+          console.log(`Ping sent to server ${time}`);
+        }
+      });
+  }
+
+  reconnect(): void {
+    if (this.socket) {
+      this.socket.connect();
+    }
   }
 
   disconnect(): void {
     if (this.socket) {
       this.socket.disconnect();
     }
+
+    // Gửi tín hiệu để dừng tất cả các luồng RxJS
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   sendMessage(event: string, data: any): void {
@@ -85,18 +124,35 @@ export class SocketService {
   providedIn: 'root'
 })
 export class ServerConfigurationStorageService {
+  private readonly serverAddressSubject: BehaviorSubject<NetworkAdress | null> = new BehaviorSubject<NetworkAdress | null>(null);
+  serverAddress$ = this.serverAddressSubject.asObservable();
   private readonly storageService: StorageService = inject(StorageService);
-  
+
+  get serverAddress(): NetworkAdress | null {
+    return this.serverAddressSubject.getValue();
+  }
+
+  set serverAddress(serverAddress: NetworkAdress | null) {
+    this.serverAddressSubject.next(serverAddress);
+  }
+
   async getServerConfigurationStorage(): Promise<ServerConfiguration | null> {
     const serverConfigurationStorage = await this.storageService.getItem('serverConfiguration');
+    let serverAddress: ServerConfiguration | null = null;
     if (serverConfigurationStorage) {
       try {
-        return JSON.parse(serverConfigurationStorage) as ServerConfiguration;
+        serverAddress = JSON.parse(serverConfigurationStorage) as ServerConfiguration;
+        this.serverAddressSubject.next(serverAddress.address);
+        return serverAddress;
       } catch (error) {
         console.error('Error parsing server configuration:', error);
+        serverAddress = null;
+        this.serverAddressSubject.next(null);
         return null;
       }
     } else {
+      serverAddress = null;
+      this.serverAddressSubject.next(null);
       return null;
     }
   }
@@ -104,13 +160,13 @@ export class ServerConfigurationStorageService {
   async updateServerConfiguration(newConfig: Partial<ServerConfiguration>) {
     let serverAddress = await this.getServerConfigurationStorage();
     console.log(serverAddress);
-    
-    if(serverAddress) {
+
+    if (serverAddress) {
       serverAddress = {
         ...serverAddress,
         ...newConfig
       };
-    }else{
+    } else {
       serverAddress = newConfig as ServerConfiguration;
     }
     await this.storageService.setItem('serverConfiguration', JSON.stringify(serverAddress));

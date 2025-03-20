@@ -7,7 +7,8 @@ import { SystemNotification } from 'capacitor4-notificationlistener';
 import { StorageService } from 'src/app/shared/service/storage.service';
 import { AndroidNotificationListenerService } from 'src/app/shared/service/android-notification-listener.service';
 import { AndroidForcegroundRunnerService } from 'src/app/shared/service/android-forceground-runner.service';
-import { SocketService, socketStatusMessages } from 'src/app/shared/service/socket.service';
+// import { NetworkService } from 'src/app/shared/service/network.service';
+import { ServerConfigurationStorageService, SocketService, socketStatusMessages } from 'src/app/shared/service/socket.service';
 
 //Util
 import { StringAnalysisUtil } from 'src/app/shared/utitl/string-analysis.utitl';
@@ -44,7 +45,6 @@ const compareObjects = (prev: any, curr: any) => {
     IonContent,
     IonTitle,
     IonToolbar,
-
   ],
 })
 export class HomePage implements OnInit, OnDestroy {
@@ -53,8 +53,7 @@ export class HomePage implements OnInit, OnDestroy {
   private readonly socketService: SocketService = inject(SocketService);
   private readonly androidNotificationListenerService: AndroidNotificationListenerService = inject(AndroidNotificationListenerService);
   private readonly androidForcegroundRunnerService: AndroidForcegroundRunnerService = inject(AndroidForcegroundRunnerService);
-  private readonly platform: Platform = inject(Platform);
-
+  private readonly serverConfigurationStorageService: ServerConfigurationStorageService = inject(ServerConfigurationStorageService);
   private readonly modalCtrl: ModalController = inject(ModalController);
 
   forcegroundServiceStatus$: Observable<boolean> = this.androidForcegroundRunnerService.forcegroundServiceStatus$;
@@ -97,14 +96,19 @@ export class HomePage implements OnInit, OnDestroy {
   async ngOnInit() { }
 
   async ionViewDidEnter() {
-    const forcegroundServiceStatusPromise: Promise<boolean> = lastValueFrom(this.forcegroundServiceStatus$.pipe(
-      take(1)
-    ));
-    const forcegroundServiceStatus = await forcegroundServiceStatusPromise;
-    if (!forcegroundServiceStatus) {
-      await this.startForcegroundService();
-      this.listenOnSocketStatusAfterForcegroundServiceStart();
-    };
+    try {
+      const forcegroundServiceStatusPromise: Promise<boolean> = lastValueFrom(this.forcegroundServiceStatus$.pipe(
+        take(1)
+      ));
+
+      const forcegroundServiceStatus = await forcegroundServiceStatusPromise;
+      if (!forcegroundServiceStatus) {
+        await this.startForcegroundService();
+        this.listenOnSocketStatusAfterForcegroundServiceStart();
+      };
+    } catch (error) {
+      console.error('Error in ionViewDidEnter:', error);
+    }
   }
 
   private async checkPackageStorage() {
@@ -143,18 +147,31 @@ export class HomePage implements OnInit, OnDestroy {
 
   private listenNotification() {
     this.subscription.add(
-      this.notifications$.subscribe((notification) => {
+      this.notifications$.subscribe(async (notification) => {
         this.notifications.push(notification);
         this.notifications = [...this.notifications];
         this.cdr.detectChanges();
 
+        console.log(`Notification: ${JSON.stringify(notification)}`);
+
         const notificationText = notification.text;
         const allAmounts = StringAnalysisUtil.extractMonetaryAmounts(notificationText);
         const convertToIntegers = StringAnalysisUtil.convertToIntegers(allAmounts);
-
+        
         if (convertToIntegers.length === 0) return;
         const amount = convertToIntegers[0];
         this.socketService.sendMessage('the-new-payment', { amount });
+        await this.androidForcegroundRunnerService.updateForcegroundBodyNotification(this.socketService.socketStatus);
+        if(this.socketService.socketStatus != 'connect') {
+          console.log('Socket is not connected');
+          this.socketService.reconnect();
+          this.socketService.socketStatus$.pipe(
+            filter(status => status === 'connect'),
+            take(1)
+          ).subscribe(() => {
+            this.socketService.sendMessage('the-new-payment', { amount });
+          });
+        }
       })
     )
   }
@@ -165,9 +182,9 @@ export class HomePage implements OnInit, OnDestroy {
     await this.androidForcegroundRunnerService.checkPermissionAndRequestIfNotGranted();
     await this.androidForcegroundRunnerService.createNotificationChannel();
     await this.androidForcegroundRunnerService.startForegroundService(status);
-    const isAndroid = this.platform.is('android');
     await this.checkPackageStorage();
-    if (isAndroid) this.checkPermissionsAndStartListening();
+    await this.setServerAddress();
+    this.checkPermissionsAndStartListening();
     this.listenNotification();
   }
 
@@ -179,9 +196,17 @@ export class HomePage implements OnInit, OnDestroy {
   private listenOnSocketStatusAfterForcegroundServiceStart() {
     this.subscription.add(
       this.socketChangedAfterForcegroundServiceStart$.subscribe((status) => {
-       this.androidForcegroundRunnerService.updateForcegroundBodyNotification(status);
+        this.androidForcegroundRunnerService.updateForcegroundBodyNotification(status);
       })
     )
+  }
+  
+  private async setServerAddress() {
+    const serverConfiguration = await this.serverConfigurationStorageService.getServerConfigurationStorage();
+    if (serverConfiguration) {
+      const serverAddress = serverConfiguration.address;
+      this.socketService.setServerAddress(serverAddress);
+    }
   }
 
   ngOnDestroy() {

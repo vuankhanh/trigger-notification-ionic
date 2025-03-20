@@ -1,6 +1,6 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { addIcons } from 'ionicons';
 import { homeOutline, homeSharp, settingsOutline, settingsSharp } from 'ionicons/icons';
 import { ServerConfigurationStorageService, SocketService, socketStatusMessages } from './shared/service/socket.service';
@@ -33,14 +33,14 @@ import { IonItem, IonApp, IonSplitPane, IonMenu, IonContent, IonList, IonMenuTog
     IonRouterOutlet,
 
     ServerConfigurationComponent
-]
+  ],
+
 })
 export class AppComponent implements OnInit {
   private readonly socketService: SocketService = inject(SocketService);
   private readonly serverConfigurationStorageService: ServerConfigurationStorageService = inject(ServerConfigurationStorageService);
 
-  private readonly serverAddressSubject: BehaviorSubject<NetworkAdress | null> = new BehaviorSubject<NetworkAdress | null>(null);
-  serverAddress$ = this.serverAddressSubject.asObservable();
+  serverAddress$ = this.serverConfigurationStorageService.serverAddress$
 
   socketStatus$ = this.socketService.socketStatus$.pipe(
     map((status) => socketStatusMessages[status])
@@ -56,27 +56,16 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.setServerAddress();
-    this.serverAddress$.subscribe((serverAddress) => {
-      if (serverAddress){
-        this.socketService.setServerAddress(serverAddress);
-      }
-    });
-  }
 
-  private async setServerAddress() {
-    const serverConfiguration = await this.serverConfigurationStorageService.getServerConfigurationStorage();
-    if (serverConfiguration) {
-      this.serverAddressSubject.next(serverConfiguration.address);
-    }
   }
 
   handleServerAddress(serverAddress: NetworkAdress) {
-    this.serverAddressSubject.next(serverAddress);
     this.serverConfigurationStorageService.updateServerConfiguration({ address: serverAddress });
+    this.serverConfigurationStorageService.serverAddress = serverAddress;
+    this.socketService.setServerAddress(serverAddress);
   }
 
   resetServerAddress(){
-    this.serverAddressSubject.next(null);
+    this.serverConfigurationStorageService.serverAddress = null;
   }
 }
