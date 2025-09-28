@@ -13,16 +13,6 @@
           }
         </ion-list>
       </ion-content>
-      <ion-footer>
-        @if (serverAddress$ | async; as serverAddress) {
-          <ion-item>
-            Trạng thái socket: {{ socketStatus$ | async }}
-          </ion-item>
-          <ion-button (click)="resetServerAddress()">Đặt lại Máy chủ</ion-button>
-        } @else{
-          <app-server-configuration (serverAddressChange)="handleServerAddress($event)"></app-server-configuration>
-        }
-      </ion-footer>
     </ion-menu>
     <ion-router-outlet id="main-content"></ion-router-outlet>
   </ion-split-pane>

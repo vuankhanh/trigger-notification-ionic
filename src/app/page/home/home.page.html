@@ -1,7 +1,7 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
     <ion-title>
-      Home
+      <span>{{'Cho phép ngủ: ' +(isAllowSleep$ | async) ? 'Cho phép' : 'Từ chối'}}</span>
     </ion-title>
   </ion-toolbar>
 </ion-header>

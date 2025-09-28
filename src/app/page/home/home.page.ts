@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, Component, inject, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Platform, ModalController, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonListHeader, IonLabel, IonItem, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonButton } from '@ionic/angular/standalone';
+import { ModalController, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonListHeader, IonLabel, IonItem, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonButton } from '@ionic/angular/standalone';
 
 //Service
 import { SystemNotification } from 'capacitor4-notificationlistener';
@@ -8,15 +8,16 @@ import { StorageService } from 'src/app/shared/service/storage.service';
 import { AndroidNotificationListenerService } from 'src/app/shared/service/android-notification-listener.service';
 import { AndroidForcegroundRunnerService } from 'src/app/shared/service/android-forceground-runner.service';
 // import { NetworkService } from 'src/app/shared/service/network.service';
-import { ServerConfigurationStorageService, SocketService, socketStatusMessages } from 'src/app/shared/service/socket.service';
+import { KeepAwakeService } from 'src/app/shared/service/keep-awake.service';
 
 //Util
 import { StringAnalysisUtil } from 'src/app/shared/utitl/string-analysis.utitl';
 
 //Rxjs
-import { BehaviorSubject, distinctUntilChanged, filter, lastValueFrom, map, Observable, of, Subscription, switchMap, take, tap } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, filter, interval, lastValueFrom, map, Observable, Subscription, switchMap, take, tap } from 'rxjs';
 import { NotificationConfigurationPage } from 'src/app/shared/page/home/notification-configuration/notification-configuration.page';
 import { INotificatonConfiguration } from 'src/app/shared/interface/notificaton-configuration.interface';
+import { HttpRequestService } from 'src/app/shared/service/http-request.service';
 
 // Hàm so sánh tùy chỉnh để so sánh hai đối tượng
 const compareObjects = (prev: any, curr: any) => {
@@ -50,26 +51,16 @@ const compareObjects = (prev: any, curr: any) => {
 export class HomePage implements OnInit, OnDestroy {
   private readonly cdr: ChangeDetectorRef = inject(ChangeDetectorRef);
   private readonly storageService: StorageService = inject(StorageService);
-  private readonly socketService: SocketService = inject(SocketService);
+  private readonly allowAwakeService: KeepAwakeService = inject(KeepAwakeService);
   private readonly androidNotificationListenerService: AndroidNotificationListenerService = inject(AndroidNotificationListenerService);
   private readonly androidForcegroundRunnerService: AndroidForcegroundRunnerService = inject(AndroidForcegroundRunnerService);
-  private readonly serverConfigurationStorageService: ServerConfigurationStorageService = inject(ServerConfigurationStorageService);
+  private readonly httpRequestService: HttpRequestService = inject(HttpRequestService);
   private readonly modalCtrl: ModalController = inject(ModalController);
 
   forcegroundServiceStatus$: Observable<boolean> = this.androidForcegroundRunnerService.forcegroundServiceStatus$;
   notificationPackage$: BehaviorSubject<string | 'all' | null> = new BehaviorSubject<string | 'all' | null>('all');
 
-  private socketStatus$ = this.socketService.socketStatus$.pipe(
-    map((status) => socketStatusMessages[status]),
-    distinctUntilChanged()
-  );
-
-  private socketChangedAfterForcegroundServiceStart$: Observable<string> = this.socketStatus$.pipe(
-    switchMap((status) => this.androidForcegroundRunnerService.forcegroundServiceStatus$.pipe(
-      filter((status) => !!status),
-      map(() => status)
-    ))
-  );
+  isAllowSleep$: Observable<boolean> = this.allowAwakeService.allowSleep$;
 
   private readonly notifications$: Observable<SystemNotification> = this.androidNotificationListenerService.notifications$.pipe(
     filter((notification) => !!notification),
@@ -104,7 +95,6 @@ export class HomePage implements OnInit, OnDestroy {
       const forcegroundServiceStatus = await forcegroundServiceStatusPromise;
       if (!forcegroundServiceStatus) {
         await this.startForcegroundService();
-        this.listenOnSocketStatusAfterForcegroundServiceStart();
       };
     } catch (error) {
       console.error('Error in ionViewDidEnter:', error);
@@ -160,53 +150,33 @@ export class HomePage implements OnInit, OnDestroy {
         
         if (convertToIntegers.length === 0) return;
         const amount = convertToIntegers[0];
-        this.socketService.sendMessage('the-new-payment', { amount });
-        await this.androidForcegroundRunnerService.updateForcegroundBodyNotification(this.socketService.socketStatus);
-        if(this.socketService.socketStatus != 'connect') {
-          console.log('Socket is not connected');
-          this.socketService.reconnect();
-          this.socketService.socketStatus$.pipe(
-            filter(status => status === 'connect'),
-            take(1)
-          ).subscribe(() => {
-            this.socketService.sendMessage('the-new-payment', { amount });
-          });
-        }
+        this.httpRequestService.postData('http://192.168.1.5:3100', amount);
+
+      })
+    )
+  }
+
+  testServer(){
+    this.subscription.add(
+      interval(10000).subscribe(async() => {
+        await this.httpRequestService.testServer('http://192.168.1.5:3100')
       })
     )
   }
 
   async startForcegroundService() {
-    const socketStatusPromise: Promise<string> = lastValueFrom(this.socketStatus$.pipe(take(1)));
-    const status = await socketStatusPromise;
     await this.androidForcegroundRunnerService.checkPermissionAndRequestIfNotGranted();
     await this.androidForcegroundRunnerService.createNotificationChannel();
-    await this.androidForcegroundRunnerService.startForegroundService(status);
+    await this.androidForcegroundRunnerService.startForegroundService();
     await this.checkPackageStorage();
-    await this.setServerAddress();
     this.checkPermissionsAndStartListening();
     this.listenNotification();
+    this.testServer();
   }
 
   async stopForcegroundService() {
     await this.androidForcegroundRunnerService.stopForegroundService();
     this.subscription.unsubscribe();
-  }
-
-  private listenOnSocketStatusAfterForcegroundServiceStart() {
-    this.subscription.add(
-      this.socketChangedAfterForcegroundServiceStart$.subscribe((status) => {
-        this.androidForcegroundRunnerService.updateForcegroundBodyNotification(status);
-      })
-    )
-  }
-  
-  private async setServerAddress() {
-    const serverConfiguration = await this.serverConfigurationStorageService.getServerConfigurationStorage();
-    if (serverConfiguration) {
-      const serverAddress = serverConfiguration.address;
-      this.socketService.setServerAddress(serverAddress);
-    }
   }
 
   ngOnDestroy() {

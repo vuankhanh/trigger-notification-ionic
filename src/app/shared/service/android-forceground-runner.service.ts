@@ -1,10 +1,10 @@
 import { inject, Injectable } from '@angular/core';
 import { ForegroundService, Importance } from '@capawesome-team/capacitor-android-foreground-service';
-import { KeepAwake } from '@capacitor-community/keep-awake';
 import { AndroidLocalNotificationService } from './android-local-notification.service';
+import { AndroidBatteryOptimizationService } from './android-battery-optimization.service';
+import { KeepAwakeService } from './keep-awake.service';
 
 import { BehaviorSubject } from 'rxjs';
-import { AndroidBatteryOptimizationService } from './android-battery-optimization.service';
 
 @Injectable({
   providedIn: 'root'
@@ -12,6 +12,7 @@ import { AndroidBatteryOptimizationService } from './android-battery-optimizatio
 export class AndroidForcegroundRunnerService {
   private readonly androidBatteryOptimizationService: AndroidBatteryOptimizationService = inject(AndroidBatteryOptimizationService);
   private readonly androidLocalNotificationService: AndroidLocalNotificationService = inject(AndroidLocalNotificationService);
+  private readonly keepAwakeService: KeepAwakeService = inject(KeepAwakeService);
 
   private readonly forcegroundServiceStatusSubject: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
   forcegroundServiceStatus$ = this.forcegroundServiceStatusSubject.asObservable();
@@ -24,21 +25,21 @@ export class AndroidForcegroundRunnerService {
     }
   }
 
-  startForegroundService = async (socketStatus: string) => {
+  startForegroundService = async () => {
     if (!this.forcegroundServiceStatusSubject.value) {
       console.log('Starting Foreground Service...');
       await ForegroundService.startForegroundService({
         id: 1,
         title: 'Dịch vụ Trigger Notification',
-        body: `Trạng thái kết nối: ${socketStatus}`,
+        body: ``,
         smallIcon: 'ic_hardware',
         silent: false,
         notificationChannelId: 'default',
       });
-      // Giữ màn hình thiết bị không tắt
-      await KeepAwake.keepAwake();
+      // Không cho thiết bị ngủ
+      await this.keepAwakeService.dontAllowSleep();
       // Tắt chế độ tối ưu pin
-      this.androidBatteryOptimizationService.requestIgnoreBatteryOptimization();
+      await this.androidBatteryOptimizationService.requestIgnoreBatteryOptimization();
       this.forcegroundServiceStatusSubject.next(true);
       console.log('Foreground Service started.');
     } else {
@@ -51,7 +52,7 @@ export class AndroidForcegroundRunnerService {
     await ForegroundService.updateForegroundService({
       id: 1,
         title: 'Dịch vụ Trigger Notification',
-        body: `Trạng thái kết nối: ${socketStatus}`,
+        body: `Trạng thái kết nối: ${socketStatus}.`,
         smallIcon: 'ic_hardware',
         silent: false,
         notificationChannelId: 'default',
@@ -62,9 +63,7 @@ export class AndroidForcegroundRunnerService {
     if (this.forcegroundServiceStatusSubject.value) {
       await ForegroundService.stopForegroundService();
       // Cho phép thiết bị ngủ
-      await KeepAwake.allowSleep();
-      // Mở chế độ tối ưu pin
-      this.androidBatteryOptimizationService.openBatteryOptimizationSettings();
+      await this.keepAwakeService.allowSleep();
       this.forcegroundServiceStatusSubject.next(false);
       console.log('Foreground Service stopped.');
     } else {
